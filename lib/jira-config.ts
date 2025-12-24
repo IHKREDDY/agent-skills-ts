@@ -23,11 +23,24 @@ export interface JiraConfig {
 
 /**
  * Load configuration from .env file
+ * Searches in current directory and parent directories
  */
 function loadEnvFile(): Partial<JiraConfig> {
-  const envPath = resolve(process.cwd(), '.env');
-  if (existsSync(envPath)) {
-    config({ path: envPath });
+  const cwd = process.cwd();
+  
+  // Search for .env in current directory and parent directories
+  const searchPaths = [
+    resolve(cwd, '.env'),
+    resolve(cwd, '..', '.env'),
+    resolve(cwd, '..', '..', '.env'),
+    resolve(cwd, '..', '..', '..', '.env'),
+  ];
+  
+  for (const envPath of searchPaths) {
+    if (existsSync(envPath)) {
+      config({ path: envPath });
+      break;
+    }
   }
   
   return {
