@@ -1,19 +1,18 @@
 /**
  * Jira Configuration Manager
- * Reads credentials from .env file or environment variables
+ * 
+ * Reads credentials from multiple sources (in priority order):
+ * 1. Environment variables (JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN)
+ * 2. .env file in project root
+ * 3. VS Code workspace settings (via .vscode/settings.json) - URL/email only
+ * 
+ * Security: Never commit credentials to git. Use .env files (gitignored)
+ * or environment variables. API tokens should ONLY be in .env or env vars.
  */
 
 import { config } from 'dotenv';
-import { existsSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-// Load .env from project root
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const envPath = resolve(process.cwd(), '.env');
-if (existsSync(envPath)) {
-  config({ path: envPath });
-}
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 
 export interface JiraConfig {
   url: string;
@@ -22,21 +21,95 @@ export interface JiraConfig {
   defaultProject: string;
 }
 
+/**
+ * Load configuration from .env file
+ */
+function loadEnvFile(): Partial<JiraConfig> {
+  const envPath = resolve(process.cwd(), '.env');
+  if (existsSync(envPath)) {
+    config({ path: envPath });
+  }
+  
+  return {
+    url: process.env.JIRA_URL,
+    email: process.env.JIRA_EMAIL,
+    token: process.env.JIRA_API_TOKEN,
+    defaultProject: process.env.JIRA_DEFAULT_PROJECT,
+  };
+}
+
+/**
+ * Load configuration from VS Code workspace settings
+ * Note: Only loads URL, email, and project - NOT the token (for security)
+ */
+function loadVSCodeSettings(): Partial<JiraConfig> {
+  const settingsPath = resolve(process.cwd(), '.vscode', 'settings.json');
+  
+  if (!existsSync(settingsPath)) {
+    return {};
+  }
+  
+  try {
+    const content = readFileSync(settingsPath, 'utf-8');
+    // Remove comments (VS Code settings can have comments)
+    const jsonContent = content.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const settings = JSON.parse(jsonContent);
+    
+    // Look for jira settings under "agentSkills.jira" namespace
+    const jiraSettings = settings['agentSkills.jira'] || {};
+    
+    return {
+      url: jiraSettings.url,
+      email: jiraSettings.email,
+      // Token should NOT be in settings.json - only in .env
+      defaultProject: jiraSettings.defaultProject,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Get Jira configuration from all available sources
+ */
 export function getJiraConfig(): JiraConfig {
-  const url = process.env.JIRA_URL;
-  const email = process.env.JIRA_EMAIL;
-  const token = process.env.JIRA_API_TOKEN;
-  const defaultProject = process.env.JIRA_DEFAULT_PROJECT || 'SAM1';
+  // Load from all sources
+  const envConfig = loadEnvFile();
+  const vscodeConfig = loadVSCodeSettings();
+  
+  // Priority: Environment/dotenv > VS Code settings
+  const url = envConfig.url || vscodeConfig.url;
+  const email = envConfig.email || vscodeConfig.email;
+  const token = envConfig.token; // Token only from env (secure)
+  const defaultProject = envConfig.defaultProject || vscodeConfig.defaultProject || 'SAM1';
 
   if (!url || !email || !token) {
+    console.error('');
     console.error('❌ Missing Jira configuration');
     console.error('');
-    console.error('Set up credentials in .env file:');
-    console.error('  JIRA_URL=https://your-domain.atlassian.net');
-    console.error('  JIRA_EMAIL=your-email@example.com');
-    console.error('  JIRA_API_TOKEN=your-api-token');
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('');
-    console.error('Or set environment variables.');
+    console.error('📋 Quick Setup (recommended):');
+    console.error('');
+    console.error('   1. Copy the template:');
+    console.error('      cp .github/skills/.env.example .env');
+    console.error('');
+    console.error('   2. Edit .env with your credentials:');
+    console.error('      JIRA_URL=https://ihkreddy.atlassian.net');
+    console.error('      JIRA_EMAIL=your-email@example.com');
+    console.error('      JIRA_API_TOKEN=your-api-token');
+    console.error('');
+    console.error('   3. Get your API token from:');
+    console.error('      https://id.atlassian.com/manage-profile/security/api-tokens');
+    console.error('');
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error('');
+    
+    if (!url) console.error('   ❌ Missing: JIRA_URL');
+    if (!email) console.error('   ❌ Missing: JIRA_EMAIL');
+    if (!token) console.error('   ❌ Missing: JIRA_API_TOKEN');
+    console.error('');
+    
     process.exit(1);
   }
 

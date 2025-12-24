@@ -4,6 +4,7 @@
   "description": "Agent Skills for GitHub Copilot - TypeScript/Node.js implementation",
   "type": "module",
   "scripts": {
+    "setup": "npx ts-node --esm scripts/setup.ts",
     "build": "tsc",
     "create-ticket": "npx ts-node --esm skills/create-ticket/scripts/create-ticket.ts",
     "work-on-ticket": "npx ts-node --esm skills/work-on-ticket/scripts/start-work.ts",
