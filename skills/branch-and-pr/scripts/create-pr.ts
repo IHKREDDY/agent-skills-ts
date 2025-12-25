@@ -108,7 +108,12 @@ async function main() {
     
     if (existingPR) {
       console.log(`\n⚠️  A PR already exists for this branch:`);
+      console.log('');
+      console.log('═'.repeat(60));
+      console.log('🔗 PR LINK:');
       console.log(`   ${existingPR}`);
+      console.log('═'.repeat(60));
+      console.log('');
       return;
     }
   } catch {
@@ -163,12 +168,18 @@ ${typeof description === 'string' ? description : 'See Jira ticket for details.'
       { encoding: 'utf-8' }
     );
     
+    const prUrl = result.trim();
+    
     console.log(`\n✅ Pull Request created successfully!`);
-    console.log(`   ${result.trim()}`);
+    console.log('');
+    console.log('═'.repeat(60));
+    console.log('🔗 PR LINK:');
+    console.log(`   ${prUrl}`);
+    console.log('═'.repeat(60));
+    console.log('');
     
     // Add comment to Jira
     try {
-      const prUrl = result.trim();
       await client.addComment(ticketKey, `Pull Request created: ${prUrl}`);
       console.log('   Added PR link to Jira ticket');
     } catch {
